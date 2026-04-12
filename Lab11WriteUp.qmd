@@ -376,3 +376,9 @@ Yes, Bootstrapping shows fairly similar density plots as traditional sampling. T
 
 # Executive Summary
 Summarize the work you've done here to provide a brief (200-300 word) summary of the simulation and the results using your work in Lab 11. Your summary should be professional, clear, and all claims should be corroborated with statistical support.
+
+
+**Solution**
+
+In this lab, we compared the sample variance and population variance estimators across four distributions using their bias, precision, and mean squared errors. In addition to these standard estimator metrics, we plot the density of estimates across sample size to demonstrate the convergence of the estimators as sample size increases.
+
