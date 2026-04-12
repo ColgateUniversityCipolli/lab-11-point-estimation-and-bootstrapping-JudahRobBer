@@ -105,14 +105,273 @@ Create a plot or combination of plots (using patchwork) to show the results acro
 \textrm{Mean Square Error} &= \textrm{Bias}^2 + \textrm{Variance of Estimates}.
 \end{align*}
 
+```{r}
+#| echo: false
+
+set.seed(7272)
+
+gen.rnorm = function(mean,sd) {
+  function(size) {rnorm(size,mean,sd)}
+}
+
+gen.rbinom = function(n,p) {
+  function(size) {rbinom(size,n,p)}
+}
+
+gen.rpois = function(lambda) {
+  function(size) {rpois(size,lambda)}
+}
+
+gen.rexp = function(lambda) {
+  function(size) {rnorm(size,lambda)}
+}
+
+
+sample.variances = function(n,size, distribution,mean) {
+  sn1 = c()
+  sn = c()
+
+  for (i in 1:n) {
+    sample = distribution(size)
+    difference.squared = (sample - mean)^2
+    total = sum(difference.squared)
+    sn1 = c(sn1,(1 / (size - 1)) * total)
+    sn = c(sn,(1 / size) * total)
+  }
+
+  list(sn1 = sn1, sn = sn, sn1_mean = mean(sn1), sn1_var = var(sn1), sn_mean = mean(sn), sn_var = var(sn))
+}
+
+
+num.sims = 1000
+gen.variances.df = function(sizes,distributions,true_variance) {
+  map(sizes, function(size) {
+  distributions |>
+    rowwise() |>
+    mutate(
+      sampleSize = size,
+      sim           = list(sample.variances(num.sims, size, func, mean)),
+      sn1_mean      = sim[["sn1_mean"]],
+      sn1_var       = sim[["sn1_var"]],
+      sn_mean       = sim[["sn_mean"]],
+      sn_var        = sim[["sn_var"]],
+      sn1_bias      = sn1_mean - true_variance, #fixed
+      sn1_precision = 1 / sn1_var,
+      sn1_mse       = sn1_bias^2 + sn1_var,
+      sn_bias       = sn_mean - true_variance, #fixed
+      sn_precision  = 1 / sn_var,
+      sn_mse        = sn_bias^2 + sn_var
+
+    ) |>
+    ungroup()
+  }) |>
+  list_rbind()
+}
+
+
+distributions = tibble(
+  distribution = c("Poisson","Binomial","Normal","Exponential"),
+  func = c(gen.rpois(2),gen.rbinom(50,((5-sqrt(21)) / 10)),gen.rnorm(0,sqrt(2)),gen.rexp(1/sqrt(2))),
+  mean = c(2,50 * ((5-sqrt(21)) / 10), 0, sqrt(2))
+)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-2.1
+#| tbl-cap: Table of Variance Estimators by Distribution with n = 20
+
+df = gen.variances.df(c(20),distributions,true_variance = 2)
+
+tbl = df |>
+  dplyr::select(distribution,sn1_bias, sn1_precision,sn1_mse,sn_bias,sn_precision,sn_mse) |>
+  knitr::kable(digits=2)
+
+(tbl)
+```
+
+```{r}
+#| echo: false
+make.density.plots = function(df) {
+  plots = df |>
+  pmap(function(sim, sampleSize, distribution, ...) {
+    ggdat = tibble(
+      sn1 = sim[["sn1"]],
+      sn  = sim[["sn"]]
+    ) |>
+      pivot_longer(everything(), names_to = "estimator", values_to = "value")
+    
+    ggplot(ggdat) +
+      geom_density(aes(x = value, fill = estimator), alpha = 0.5) +
+      xlab("Estimate") +
+      ylab("Density") +
+      ggtitle(paste(distribution,"n =", sampleSize)) +
+      theme_bw()
+  })
+
+  wrap_plots(plots) +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title    = "Sampling Distributions of Variance Estimators"
+  ) &
+  theme(legend.position = "bottom")
+}
+
+
+```
+
+```{r}
+#| echo: false
+#| label: fig-2.1
+#| fig-cap: "Simulation Results by Distribution"
+
+plot = make.density.plots(df)
+(plot)
+```
+
+
+
+With a sample size of $20$, there is not convincing evidence that the $S_{n-1}^2$ is a better estimator than $S_n^2$.
+
 ## Simulation over various sample sizes
 Consider the effect of the sample size have on these results. Provide a graphical and numerical summary of what happens as $n$ increases -- say $n=20$, $n=50$, $n=100$, and $n=500$. Does the result in your initial simulation hold across samples? Or, do things change as the sample size changes? Ensure to set your randomization seed.
+
+
+```{r}
+#| echo: false
+#| label: tbl-2.2
+#| tbl-cap: Table of Estimators Across Sample Sizes
+set.seed(7272)
+
+df = gen.variances.df(c(20,50,100,500),distributions,true_variance = 2)
+
+tbl = df |>
+  dplyr::select(distribution,sampleSize,sn1_bias,sn1_precision,sn1_mse,sn_bias,sn_precision,sn_mse) |>
+  knitr::kable(digits=2)
+
+(tbl)
+```
+
+
+```{r}
+ #| echo: false
+ #| label fig-2.2-bias
+ #| fig-cap: Estimator Bias by Sample Size Across Distribution
  
+ plot = df |>
+  ggplot() +
+  geom_line(aes(x = sampleSize, y = sn1_bias, colour = "sn1 bias")) +
+  geom_line(aes(x = sampleSize, y = sn_bias,  colour = "sn bias")) +
+  geom_point(aes(x = sampleSize, y = sn1_bias, colour = "sn1 bias")) +
+  geom_point(aes(x = sampleSize, y = sn_bias,  colour = "sn bias")) +
+  scale_colour_manual(
+    name   = "Estimator",
+    values = c("sn1 bias" = "#FF0000",
+               "sn bias"  = "#0000FF")
+  ) +
+  labs(x = "Sample Size", y = "Bias") +
+  facet_wrap(~distribution)
+
+(plot) 
+```
+
+ 
+```{r}
+#| echo: false
+#| label: fig-2.2
+#| fig-cap: "Simulation Results by Distribution across sample sizes"
+#| fig-width: 16
+#| fig-height: 12
+
+plot = make.density.plots(df)
+(plot)
+
+```
+
 ## Simulation
 You have written code to draw a random sample of various sizes from each distribution, and to calculate and store the calculated estimates. Rework your code to produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do you have a guess about their distribution? Ensure to set your randomization seed. 
 
+**Solution**
+
+I previously generated density plots. As shown in @fig-2.2 The plots look pretty normal, and tend to look more normal as sample size increases. 
+
 ## Bootstrap
 Now, take *one* sample from each distribution. Instead of drawing a random sample at each iteration, sample *with replacement* from the one sample. Produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do we get roughly the same information as we do in the full simulation? Try this over several seeds -- what do you notice? Ensure to set your randomization seed.
+
+**Solution**
+
+```{r}
+bootstrap.sample.variances = function(n,size, distribution,mean) {
+  sn1 = c()
+  sn = c()
+  sample.orig = distribution(size)
+  for (i in 1:n) {
+    sample.virtual = sample(sample.orig,size,replace=T)
+    difference.squared = (sample.virtual - mean)^2
+    total = sum(difference.squared)
+    sn1 = c(sn1,(1 / (size - 1)) * total)
+    sn = c(sn,(1 / size) * total)
+  }
+
+  list(sn1 = sn1, sn = sn, sn1_mean = mean(sn1), sn1_var = var(sn1), sn_mean = mean(sn), sn_var = var(sn))
+}
+
+gen.boostrapped.variances.df = function(sizes,distributions,true_variance) {
+  map(sizes, function(size) {
+  distributions |>
+    rowwise() |>
+    mutate(
+      sampleSize = size,
+      sim           = list(bootstrap.sample.variances(num.sims, size, func, mean)),
+      sn1_mean      = sim[["sn1_mean"]],
+      sn1_var       = sim[["sn1_var"]],
+      sn_mean       = sim[["sn_mean"]],
+      sn_var        = sim[["sn_var"]],
+      sn1_bias      = sn1_mean - true_variance, #fixed
+      sn1_precision = 1 / sn1_var,
+      sn1_mse       = sn1_bias^2 + sn1_var,
+      sn_bias       = sn_mean - true_variance, #fixed
+      sn_precision  = 1 / sn_var,
+      sn_mse        = sn_bias^2 + sn_var
+
+    ) |>
+    ungroup()
+  }) |>
+  list_rbind()
+}
+```
+
+```{r}
+#| echo: false
+#| label: fig-2.4-a
+#| fig-cap: Boostrapped sample with random seed 7272
+set.seed(7272)
+df = gen.boostrapped.variances.df(c(20),distributions,true_variance = 2)
+plot = make.density.plots(df)
+(plot)
+```
+
+```{r}
+#| echo: false
+#| label: fig-2.4-b
+#| fig-cap: Boostrapped sample with random seed 777
+set.seed(777)
+df = gen.boostrapped.variances.df(c(20),distributions,true_variance = 2)
+plot = make.density.plots(df)
+(plot)
+```
+
+```{r}
+#| echo: false
+#| label: fig-2.4-c
+#| fig-cap: Boostrapped sample with random seed 2718
+set.seed(2718)
+df = gen.boostrapped.variances.df(c(20),distributions,true_variance = 2)
+plot = make.density.plots(df)
+(plot)
+```
+
+Yes, Bootstrapping shows fairly similar density plots as traditional sampling. Though by comparing @fig-2.4-a and @fig-2.4-b we can see that the difference between our two estimators with a small sample size is influenced by our choice of random seed. Still, given the plots it is reasonable to conclude that bootstrapping captured most of the information from the full sample.
 
 
 # Executive Summary
