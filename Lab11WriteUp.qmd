@@ -123,7 +123,7 @@ gen.rpois = function(lambda) {
 }
 
 gen.rexp = function(lambda) {
-  function(size) {rnorm(size,lambda)}
+  function(size) {rexp(size,lambda)}
 }
 
 
@@ -255,7 +255,7 @@ tbl = df |>
 
 ```{r}
  #| echo: false
- #| label fig-2.2-bias
+ #| label: fig-2.2-bias
  #| fig-cap: Estimator Bias by Sample Size Across Distribution
  
  plot = df |>
@@ -364,9 +364,19 @@ plot = make.density.plots(df)
 ```{r}
 #| echo: false
 #| label: fig-2.4-c
-#| fig-cap: Boostrapped sample with random seed 2718
+#| fig-cap: Boostrapped sample with random seed 2718 with sample size 20
 set.seed(2718)
 df = gen.boostrapped.variances.df(c(20),distributions,true_variance = 2)
+plot = make.density.plots(df)
+(plot)
+```
+
+```{r}
+#| echo: false
+#| label: fig-2.4-d
+#| fig-cap: Boostrapped sample with random seed 2718 with sample size 200
+set.seed(2718)
+df = gen.boostrapped.variances.df(c(200),distributions,true_variance = 2)
 plot = make.density.plots(df)
 (plot)
 ```
@@ -381,4 +391,8 @@ Summarize the work you've done here to provide a brief (200-300 word) summary of
 **Solution**
 
 In this lab, we compared the sample variance and population variance estimators across four distributions using their bias, precision, and mean squared errors. In addition to these standard estimator metrics, we plot the density of estimates across sample size to demonstrate the convergence of the estimators as sample size increases.
+
+Principally, we expect that as sample size increases, our estimators converge since $\lim_{n \to \infty}{\frac{1}{n}} = \lim_{n \to \infty}{\frac{1}{n-1}}$. Our results in @fig-2.2 are consistent with this, since the density of the curves are increasingly overlapping. Our density plots across sample sizes also suggest the normal distribution as the limiting distribution of our estimates. We also show in @tbl-2.2 and @fig-2.2-bias that the magnitude of bias decreases toward zero across distribution as sample size increases for both estimators, with the sample variance having a positive bias for smaller samples, while the population variance had a negative bias for smaller samples. We also find that precision increases with sample size, consistent with a decrease in variance for large samples.
+
+In addition to these results, our limited evaluation of the utility of bootstrapping demonstrated that bootstrapped sample have similar properties to regular samples, and we show in @fig-2.4-c and @fig-2.4-d that as sample size increases, bootstrapped samples have the same trend toward normality and regular samples.
 
